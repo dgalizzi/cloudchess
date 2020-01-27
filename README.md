@@ -1,2 +1,2 @@
 # cloudchess
-HTTP Interface to a UCI chess engine
+Websocket Interface to a UCI chess engine
