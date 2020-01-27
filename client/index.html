@@ -1,0 +1,83 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Flask-SocketIO Test</title>
+    <script src="//code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script src="js/chessboard-1.0.0.min.js"></script>
+    <link rel="stylesheet" href="css/chessboard-1.0.0.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.js"></script>
+
+    <script type="text/javascript" charset="utf-8">
+        $(document).ready(function() {
+            var game = new Chess();
+            var board = Chessboard('board1', {
+                draggable: true,
+                position: 'start',
+                onDrop: onDrop,
+                onSnapEnd: onSnapEnd
+            });
+            
+            function onDrop (source, target) {
+                // see if the move is legal
+                var move = game.move({
+                    from: source,
+                    to: target,
+                    promotion: 'q' // NOTE: always promote to a queen for example simplicity
+                });
+
+                // illegal move
+                if (move === null){
+                     return 'snapback';
+                }
+
+                socket.send(JSON.stringify({
+                    msg: 'fen',
+                    data: game.fen()
+                }))
+            }
+
+            // update the board position after the piece snap
+            // for castling, en passant, pawn promotion
+            function onSnapEnd () {  
+                board.position(game.fen())
+            }
+            const socket = new WebSocket('ws://localhost:5000');
+
+            // Connection opened
+            socket.addEventListener('open', function (event) {
+                //socket.send('Hello Server!');
+            });
+
+            // Listen for messages
+            socket.addEventListener('message', function (event) {
+                
+                var data = JSON.parse(event.data);
+                if (data.msg == 'analysis'){
+                    var score = data.data.score;
+                    var scoreStr = '';
+                    if (score > 0) {
+                        scoreStr = '+';
+                    }
+                    scoreStr += score;
+                    $('#score').html(scoreStr);
+                    $('#depth').html(data.data.depth);
+                    $('#analysis').html(data.data.pv);
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>Stockfish websocket</h1>
+    <div id="board1" style="width: 400px"></div>
+
+    <h2>Depth:</h2>
+    <div id="depth"></div>
+    <h2>Score:</h2>
+    <div id="score"></div>
+    <h2>Analysis:</h2>
+    <div id="analysis"></div>
+</body>
+</html>

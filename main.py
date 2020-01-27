@@ -1,59 +1,51 @@
-from flask import Flask, render_template
+from sanic import Sanic
+from sanic.websocket import WebSocketProtocol
+
 import chess
 import chess.engine
-from flask_socketio import SocketIO, emit, join_room, leave_room, \
-    close_room, rooms, disconnect
-from threading import Lock    
-app = Flask(__name__)
-async_mode = None
-app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, async_mode=async_mode)
 
-thread = None
-thread_lock = Lock()
+import json
+
+app = Sanic()
 
 engine = chess.engine.SimpleEngine.popen_uci("stockfish")
+engine.configure({"Threads": 6})
 board = chess.Board()
 
-@app.route('/')
-def index():
-    return render_template('index.html', async_mode=socketio.async_mode)
+@app.websocket('/')
+async def connect(request, ws):
+    await ws.send(json.dumps({
+        'msg': 'connected'
+    }));
 
-@socketio.on('my_ping', namespace='/test')
-def ping_pong():
-    emit('my_pong')
+    while True:
+        msg = await ws.recv()
+        js = json.loads(msg)
+        if js["msg"] == 'fen':
+            # TODO: Real infinite analysis,
+            # stopping when a new fen is requested.
+            board.set_fen(js["data"])
+            with engine.analysis(board) as analysis:
+                for info in analysis:
+                    if info.pv != None:
+                        # TODO: Sometimes stockfish returns a single move.
+                        # It seems to be a partial result when it hasn't
+                        # finished analysis the current depth.
+                        # Only show complete pvs.
+                        #print(info.score.relative.score())
+                        analysisResult = board.variation_san(info.pv)
+                        await ws.send(json.dumps({
+                            'msg': 'analysis',
+                            'data': {
+                                'depth': info.depth,
+                                'score': info.score.relative.score()/100,
+                                'pv': analysisResult
+                            }
+                        }))
 
-@socketio.on('my_event', namespace='/test')
-def test_message(message):
-    fen = message["data"]
-    print(f"Analysis for: {fen}")
-    board.set_fen(fen)
-    engine.configure({"Threads": 12})
-    depth = 0
-
-    with engine.analysis(board) as analysis:
-        for info in analysis:
-            # print(info.get("score"), info.get("pv"))
-
-            if info.pv != None:
-                print(f"pv {info.pv}")
-                analysisResult = board.variation_san(info.pv)
-                result = { 'data': analysisResult, 'depth': info.depth }
-                print(f"Result {result}")
-                emit('my_response', result)
-                # Arbitrary stop condition.
-                if info.depth == 20:
-                    return
-
-
-    # info = engine.analyse(board, chess.engine.Limit(time=5))
-
-@app.route('/<path:fen>')
-def hello_world(fen):
-    board.set_fen(fen)
-    engine.configure({"Threads": 12})
-    info = engine.analyse(board, chess.engine.Limit(time=5))
-    return board.variation_san(info.pv)
+                        # Arbitrary stop condition.
+                        if info.depth == 20:
+                            break
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    app.run(host="0.0.0.0", port=5000, protocol=WebSocketProtocol)
