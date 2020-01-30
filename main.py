@@ -6,17 +6,19 @@ import chess.engine
 
 import json
 
-app = Sanic()
+app = Sanic("Cloudchess")
 
 engine = chess.engine.SimpleEngine.popen_uci("stockfish")
-engine.configure({"Threads": 6})
+
+# TODO: Configure through the API
+engine.configure({"Threads": 12, "Hash": 4096})
 board = chess.Board()
 
 @app.websocket('/')
 async def connect(request, ws):
     await ws.send(json.dumps({
         'msg': 'connected'
-    }));
+    }))
 
     while True:
         msg = await ws.recv()
@@ -32,20 +34,21 @@ async def connect(request, ws):
                         # It seems to be a partial result when it hasn't
                         # finished analysis the current depth.
                         # Only show complete pvs.
-                        #print(info.score.relative.score())
                         analysisResult = board.variation_san(info.pv)
+
                         await ws.send(json.dumps({
                             'msg': 'analysis',
                             'data': {
                                 'depth': info.depth,
-                                'score': info.score.relative.score()/100,
+                                'score': info.score.white().score()/100,
                                 'pv': analysisResult
                             }
                         }))
 
-                        # Arbitrary stop condition.
-                        if info.depth == 20:
+                        # TODO: Arbitrary stop condition.
+                        if info.depth == 25:
                             break
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, protocol=WebSocketProtocol)
+
