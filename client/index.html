@@ -10,6 +10,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.js"></script>
 
     <script type="text/javascript" charset="utf-8">
+		const socket = new WebSocket('ws://localhost:5000');
+
         $(document).ready(function() {
             var game = new Chess();
             var board = Chessboard('board1', {
@@ -43,7 +45,6 @@
             function onSnapEnd () {  
                 board.position(game.fen())
             }
-            const socket = new WebSocket('ws://localhost:5000');
 
             // Connection opened
             socket.addEventListener('open', function (event) {
@@ -67,11 +68,26 @@
                 }
             });
         });
+
+		function pauseEngine() {
+			socket.send(JSON.stringify({
+				msg: 'pause'
+			}));
+		}
+
+		function resumeEngine() {
+			socket.send(JSON.stringify({
+				msg: 'resume'
+			}));
+		}
     </script>
 </head>
 <body>
     <h1>Stockfish websocket</h1>
     <div id="board1" style="width: 400px"></div>
+
+	<button onclick="pauseEngine()">Pause</button>
+	<button onclick="resumeEngine()">Resume</button>
 
     <h2>Depth:</h2>
     <div id="depth"></div>

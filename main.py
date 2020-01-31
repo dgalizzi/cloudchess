@@ -13,6 +13,7 @@ app = Sanic("Cloudchess")
 board = chess.Board()
 
 # TODO: Maybe decouple the websocket from this function
+# How? A callback?
 async def infiniteAnalysis(engine, board, ws):
     with await engine.analysis(board) as analysis:
         async for info in analysis:
@@ -50,7 +51,7 @@ async def connect(request, ws):
         'msg': 'connected'
     }))
 
-    # TODO: pause infinite analysis from the ui
+    # TODO: stop infinite analysis to free resources
     while True:
         msg = await ws.recv()
         js = json.loads(msg)
@@ -59,9 +60,15 @@ async def connect(request, ws):
 
             if infiniteAnalysisTask:
                 infiniteAnalysisTask.cancel()
-                print("task canceled")
             loop = asyncio.get_event_loop()
             infiniteAnalysisTask = loop.create_task(infiniteAnalysis(engine, board, ws))
+        elif js["msg"] == 'pause':
+            if infiniteAnalysisTask:
+                infiniteAnalysisTask.cancel()
+        elif js["msg"] == 'resume':
+            if infiniteAnalysisTask.cancelled():
+                loop = asyncio.get_event_loop()
+                infiniteAnalysisTask = loop.create_task(infiniteAnalysis(engine, board, ws))
 
 if __name__ == '__main__':
     # TODO: Had problems running the engine together with Sanic.
