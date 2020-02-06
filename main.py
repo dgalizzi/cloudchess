@@ -10,8 +10,6 @@ import json
 
 app = Sanic("Cloudchess")
 
-board = chess.Board()
-
 # TODO: Maybe decouple the websocket from this function
 # How? A callback?
 async def infiniteAnalysis(engine, board, ws):
@@ -37,6 +35,9 @@ async def infiniteAnalysis(engine, board, ws):
 #TODO: Check console error when reloading page.
 @app.websocket('/')
 async def connect(request, ws):
+    # Initialize the board for this connection
+    board = chess.Board()
+
     # TODO: Taken from an example from the documentation.
     # Seems to work fine without this though.
     asyncio.set_event_loop_policy(chess.engine.EventLoopPolicy())
@@ -44,7 +45,7 @@ async def connect(request, ws):
     # TODO: Close the transport?
     transport, engine = await chess.engine.popen_uci("stockfish")
     # TODO: Configure through the API
-    await engine.configure({"Threads": 12, "Hash": 4096})
+    await engine.configure({"Threads": 4, "Hash": 1024})
     infiniteAnalysisTask = None
 
     await ws.send(json.dumps({
