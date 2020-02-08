@@ -41,9 +41,11 @@ async def connect(request, ws):
     # TODO: Taken from an example from the documentation.
     # Seems to work fine without this though.
     asyncio.set_event_loop_policy(chess.engine.EventLoopPolicy())
+
     # TODO: Close the engine at some point?
     # TODO: Close the transport?
     transport, engine = await chess.engine.popen_uci("stockfish")
+
     # TODO: Configure through the API
     await engine.configure({"Threads": 4, "Hash": 1024})
     infiniteAnalysisTask = None
@@ -72,8 +74,5 @@ async def connect(request, ws):
                 infiniteAnalysisTask = loop.create_task(infiniteAnalysis(engine, board, ws))
 
 if __name__ == '__main__':
-    # TODO: Had problems running the engine together with Sanic.
-    # It only started working after I uninstalled uvloop.
-    # Learn about what's going on.
     app.run(host="0.0.0.0", port=5000, protocol=WebSocketProtocol)
 
