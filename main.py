@@ -2,6 +2,7 @@ import asyncio
 
 from sanic import Sanic
 from sanic.websocket import WebSocketProtocol
+from websockets.exceptions import ConnectionClosedOK
 
 import chess
 import chess.engine
@@ -22,25 +23,26 @@ async def infiniteAnalysis(engine, board, ws):
                 # Only show complete pvs.
                 analysisResult = board.variation_san(info.pv)
 
-                await ws.send(json.dumps({
-                    'msg': 'analysis',
-                    'data': {
-                        'depth': info.depth,
-                        # TODO: there's no score when there's a mate
-                        'score': info.score.white().score()/100,
-                        'pv': analysisResult
-                    }
-                }))
+                try:
+                    await ws.send(json.dumps({
+                        'msg': 'analysis',
+                        'data': {
+                            'depth': info.depth,
+                            # TODO: there's no score when there's a mate
+                            'score': info.score.white().score()/100,
+                            'pv': analysisResult
+                        }
+                    }))
+                except (ConnectionClosedOK):
+                    await engine.quit()
+                    break
+
 
 #TODO: Check console error when reloading page.
 @app.websocket('/')
 async def connect(request, ws):
     # Initialize the board for this connection
     board = chess.Board()
-
-    # TODO: Taken from an example from the documentation.
-    # Seems to work fine without this though.
-    asyncio.set_event_loop_policy(chess.engine.EventLoopPolicy())
 
     # TODO: Close the engine at some point?
     # TODO: Close the transport?
@@ -74,5 +76,24 @@ async def connect(request, ws):
                 infiniteAnalysisTask = loop.create_task(infiniteAnalysis(engine, board, ws))
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, protocol=WebSocketProtocol)
+
+    asyncio.set_event_loop_policy(chess.engine.EventLoopPolicy())
+    server_cor = app.create_server(host="0.0.0.0", port=5000, return_asyncio_server=True, protocol=WebSocketProtocol)
+
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(server_cor)
+    server = loop.run_until_complete(task)
+
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        loop.stop()
+    finally:
+        # Wait for server to close
+        close_task = server.close()
+        loop.run_until_complete(close_task)
+
+        # Complete all tasks on the loop
+        for connection in server.connections:
+            connection.close_if_idle()
 
