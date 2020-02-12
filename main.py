@@ -24,15 +24,20 @@ async def infiniteAnalysis(engine, board, ws):
                 analysisResult = board.variation_san(info.pv)
 
                 try:
-                    await ws.send(json.dumps({
+                    isMate = info.score.is_mate()
+                    data = {
                         'msg': 'analysis',
                         'data': {
                             'depth': info.depth,
-                            # TODO: there's no score when there's a mate
-                            'score': info.score.white().score()/100,
+                            'isMate': isMate,
+                            'score': info.score.white().score()/100 if not isMate else info.score.white().mate(),
                             'pv': analysisResult
                         }
-                    }))
+                    }
+                    await ws.send(json.dumps(data))
+
+                    if info.score.is_mate():
+                        break;
                 except (ConnectionClosedOK):
                     await engine.quit()
                     break

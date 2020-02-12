@@ -55,16 +55,23 @@
             socket.addEventListener('message', function (event) {
                 
                 var data = JSON.parse(event.data);
-                if (data.msg == 'analysis'){
-                    var score = data.data.score;
-                    var scoreStr = '';
-                    if (score > 0) {
-                        scoreStr = '+';
-                    }
-                    scoreStr += score;
-                    $('#score').html(scoreStr);
-                    $('#depth').html(data.data.depth);
-                    $('#analysis').html(data.data.pv);
+                if (data.msg == 'analysis') {
+					var isMate = data.data.isMate;
+					var score = data.data.score;
+					var scoreStr = '';
+					if (isMate) {
+						scoreStr = '#' + score;
+					}
+					else {
+						if (score > 0) {
+							scoreStr = '+';
+						}
+						scoreStr += score;
+					}
+
+					$('#score').html(scoreStr);
+					$('#depth').html(data.data.depth);
+					$('#analysis').html(data.data.pv);
                 }
             });
         });
