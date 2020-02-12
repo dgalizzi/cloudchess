@@ -45,8 +45,7 @@ async def connect(request, ws):
     board = chess.Board()
 
     # TODO: Close the engine at some point?
-    # TODO: Close the transport?
-    transport, engine = await chess.engine.popen_uci("stockfish")
+    _, engine = await chess.engine.popen_uci("stockfish")
 
     # TODO: Configure through the API
     await engine.configure({"Threads": 4, "Hash": 1024})
